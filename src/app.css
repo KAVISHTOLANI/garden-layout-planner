@@ -1,0 +1,56 @@
+/* Bedmap specific styles */
+:root { --sun-full: #fbefc4; --sun-part: #e6e2c9; --sun-shade: #c9d0cf; --soil: #8a5a33; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { --sun-full: #4a4220; --sun-part: #3a3826; --sun-shade: #2a3130; } }
+:root[data-theme='dark'] { --sun-full: #4a4220; --sun-part: #3a3826; --sun-shade: #2a3130; }
+
+.plan-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); gap: 22px; align-items: start; }
+.toolbar { display: grid; gap: 12px; }
+.toolbar .tabs { flex-wrap: wrap; }
+.tool-hint { margin: 0; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12); }
+.bed-sw { background: color-mix(in srgb, var(--soil) 35%, transparent); border: 2px solid var(--soil); }
+.map-wrap { position: relative; padding: 26px 14px 14px; overflow-x: auto; }
+.north { position: absolute; top: 6px; left: 14px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
+.map { display: block; height: auto; touch-action: none; user-select: none; border-radius: 4px; }
+.map:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.map.tool-bed, .map.tool-sun, .map.tool-plant { cursor: crosshair; }
+.map.tool-erase { cursor: not-allowed; }
+.map .cell { stroke: rgb(0 0 0 / 0.07); stroke-width: 1; }
+.bed rect { fill: color-mix(in srgb, var(--soil) 28%, transparent); stroke: var(--soil); stroke-width: 2.5; }
+.bed-label { font-family: var(--font-body); font-size: 11px; font-weight: 700; fill: var(--text); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+.plant .spread { fill-opacity: 0.14; stroke-opacity: 0.55; stroke-width: 1.5; stroke-dasharray: 3 3; }
+.plant .dot { stroke: #fff; stroke-width: 1.5; }
+.plant .code { font-family: var(--font-mono); font-size: 9px; font-weight: 700; fill: #fff; text-anchor: middle; pointer-events: none; }
+.plant.hi .dot { stroke: var(--danger, #b3261e); stroke-width: 3.5; }
+.plant.hi .spread { fill-opacity: 0.3; stroke: var(--danger, #b3261e) !important; stroke-dasharray: none; }
+.preview { fill: color-mix(in srgb, var(--accent) 20%, transparent); stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; }
+.cursor { fill: none; stroke: var(--text); stroke-width: 2; stroke-dasharray: 4 3; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+
+.issues { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.issues li { display: grid; gap: 4px; justify-items: start; padding-bottom: 10px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.issues li.on { background: color-mix(in srgb, var(--accent) 7%, transparent); border-radius: var(--radius-sm); padding: 8px; }
+.issues li:last-child { border-bottom: 0; }
+.beds { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.beds li { display: grid; gap: 6px; }
+.sunbar { display: flex; height: 6px; border-radius: 99px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--border); }
+
+.plant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 16px; }
+.plant-card p { margin: 0; }
+.pcode { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: #fff; font-family: var(--font-mono); font-weight: 700; font-size: 0.78rem; text-shadow: 0 1px 1px rgb(0 0 0 / 0.35); flex: none; }
+.pcode.sm { width: 24px; height: 24px; font-size: 0.62rem; margin-right: 8px; vertical-align: middle; }
+.row-gap { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.facts dt { font-family: var(--font-mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.facts dd { margin: 0; font-weight: 600; font-size: 0.9rem; }
+.card.flush { padding: 0; }
+
+.hero-bm { display: grid; gap: 12px; }
+.hero-bm .map { width: 100%; }
+.hero-bm .plant.hi .dot { animation: throb 1.6s var(--ease) infinite; }
+@keyframes throb { 50% { stroke-width: 1; } }
+.hero-issues { display: flex; flex-wrap: wrap; gap: 6px; }
+
+@media (max-width: 960px) { .plan-layout { grid-template-columns: minmax(0, 1fr); } }
+@media print { .shell-header, .shell-footer, .btn { display: none !important; } }
+@media (prefers-reduced-motion: reduce) { .hero-bm .plant.hi .dot { animation: none; } }

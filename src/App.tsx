@@ -1,12 +1,385 @@
-import {useEffect,useMemo,useState} from 'react';import {uid,toMarkdown,csv} from './logic';import './styles.css';
-const cfg={"slug":"garden-layout-planner","name":"Bedmap","purpose":"Plan garden beds, place plants on a grid, record sunlight/watering notes, reorder crops, and export layouts.","kind":"garden","fields":["Plant","bed","sunlight","watering","position"],"accent":"emerald"} as const;const pages=[['home','Home'],['workspace','Layout workspace'],['guide','Plant guide'],['examples','Seasonal notes'],['reference','Saved layouts'],['help','Help']] as const;type Page=typeof pages[number][0];type Item={id:string;title:string;createdAt:string;[key:string]:string};const key='local-portfolio:'+cfg.slug;const makeDemo=():Item[]=>['Field note — Alder','Follow-up — Miro','Review — Sol','Plan — Juniper','Archive — Nia','Decision — Rowan','Reminder — Theo','Research — Imani','Checklist — Ellis','Exception — Saffron'].map((title,i)=>({id:'demo-'+i,title,createdAt:new Date(Date.now()-i*86400000).toISOString(),[cfg.fields[1]]:['In focus','Scheduled','Reviewed','Waiting','Reference'][i%5],[cfg.fields[2]]:['Ready','Needs review','Complete','Paused','Archived'][i%5],[cfg.fields[3]]:new Date(Date.now()+(i-3)*86400000).toISOString().slice(0,10),[cfg.fields[4]]:i===4?'A longer fictional note showing a realistic exception, the decision taken, and what should be checked before the record is used again.':'Fictional demo data for a populated local workspace.'}));function download(n:string,s:string,t='text/plain'){const x=document.createElement('a');x.href=URL.createObjectURL(new Blob([s],{type:t}));x.download=n;x.click();URL.revokeObjectURL(x.href)}
-export default function App(){const requested=location.hash.slice(1);const [page,setPage]=useState<Page|'notfound'>(()=>pages.some(([id])=>id===requested)?requested as Page:requested?'notfound':'home');const [records,setRecords]=useState<Item[]>(()=>{try{return JSON.parse(localStorage.getItem(key)||'null')||makeDemo()}catch{return makeDemo()}});const [form,setForm]=useState<Record<string,string>>({});const [query,setQuery]=useState('');const [notice,setNotice]=useState('');const [answer,setAnswer]=useState('');const [editing,setEditing]=useState<Item|null>(null);useEffect(()=>{document.title=(page==='home'?cfg.name:page==='notfound'?'Page not found':cfg.name+' — '+page);if(page!=='notfound')location.hash=page},[page]);const save=(x:Item[])=>{setRecords(x);localStorage.setItem(key,JSON.stringify(x))};const filtered=useMemo(()=>records.filter(r=>JSON.stringify(r).toLowerCase().includes(query.toLowerCase())),[records,query]);const add=(ev:React.FormEvent)=>{ev.preventDefault();const title=form[cfg.fields[0]]?.trim();if(!title){setNotice('Add a '+cfg.fields[0].toLowerCase()+' before saving.');return}const next={id:editing?.id||uid(),title,createdAt:editing?.createdAt||new Date().toISOString()} as Item;cfg.fields.forEach(f=>next[f]=form[f]||'');save(editing?records.map(r=>r.id===editing.id?next:r):[next,...records]);setForm({});setEditing(null);setNotice(editing?'Record updated locally.':'Saved locally. You can now find it in the archive or export it.')};const importJson=async(file?:File)=>{if(!file)return;try{const parsed=JSON.parse(await file.text());if(!Array.isArray(parsed)||!parsed.every(x=>x&&typeof x.title==='string'))throw new Error();save(parsed);setNotice('Imported '+parsed.length+' records into this browser.')}catch{setNotice('That file is not a valid export. Your existing records were left unchanged.')}};return <div className={'app '+cfg.accent}><div className="shell"><header><div className="brand"><small>LOCAL EDITION</small>{cfg.name}</div><nav aria-label="Primary">{pages.map(([id,label])=><button className={page===id?'active':''} key={id} onClick={()=>setPage(id)}>{label}</button>)}</nav></header>{page==='home'&&<Home records={records} open={()=>setPage('workspace')}/>} {page==='workspace'&&<Workspace/>}{page==='notfound'&&<NotFound/>}{page==='guide'&&<Guide title="Plant guide"/>}{page==='examples'&&<Examples/>}{page==='reference'&&<Reference/>}{page==='help'&&<Help/>}</div></div>;
-function Home({records,open}:{records:Item[];open:()=>void}){return <><section className="hero"><div><p className="eyebrow">A CLEARER WAY TO WORK LOCALLY</p><h1>Bedmap keeps the important details <i>findable.</i></h1><p>A garden layout is easier to adjust when beds, plants, light, and watering needs share one visual record.</p><div className="actions"><button className="primary" onClick={open}>Open layout workspace</button><button onClick={()=>download(cfg.slug+'-demo.md',toMarkdown(cfg.name,records))}>Export demo</button></div></div><aside className="preview"><div className="preview-head">LIVE SAMPLE <span>● DEMO DATA</span></div><div className="preview-title">What is ready today</div>{records.slice(0,3).map((r,i)=><div className="peek" key={r.id}><div><b>{r.title}</b><br/><small>{r[cfg.fields[1]]}</small></div><span>{i===0?'NOW':'SAVED'}</span></div>)}<div className="preview-foot">No account. No sync. Export when you choose.</div></aside></section><section className="section"><p className="eyebrow">01 / FIRST RECORD</p><h2>Begin with a record you will need again.</h2><p>Create a bed record, place a plant on the grid, then add the practical light and watering notes.</p><div className="card-grid"><div className="info-card"><strong>1. Name the detail</strong><p>Use the first field for the thing you will search for later, rather than a vague catch-all.</p></div><div className="info-card"><strong>2. Add context</strong><p>Record the practical facts beside it: status, timing, and the note that explains the decision.</p></div><div className="info-card"><strong>3. Review deliberately</strong><p>Search your local history, export when needed, and remove data that is no longer useful.</p></div></div></section><section className="section story"><p className="eyebrow">02 / WHY THIS RECORD EXISTS</p><h2>Small details are where useful decisions begin.</h2><p>{cfg.purpose} This is deliberately a local record rather than a social feed, an account portal, or an automated recommendation. It gives you a calm place to capture the exact fact, its context, and the practical next question while you still remember why it matters.</p><p>Every entry is searchable by the words you wrote. Use concise fields for things you expect to compare later, then use the note for nuance: an exception, an uncertainty, or the reason a future version of you should pause before acting.</p></section><section className="section"><p className="eyebrow">03 / THE CURRENT DESK</p><h2>Ten examples, clearly fictional.</h2><p>The first records are labelled demo data. They exist to demonstrate active, scheduled, reviewed, and archived states—never to imply real people, transactions, outcomes, or activity.</p><div className="card-grid">{records.slice(0,6).map((r,i)=><div className="info-card" key={r.id}><strong>{String(i+1).padStart(2,'0')} · {r.title}</strong><p>{r[cfg.fields[1]]} · {r[cfg.fields[2]]}<br/>{r[cfg.fields[4]]}</p></div>)}</div></section><section className="section"><p className="eyebrow">04 / A PRACTICAL LOOP</p><h2>Capture. Review. Carry forward.</h2><div className="card-grid"><div className="info-card"><strong>Capture</strong><p>Open the workspace when the detail is fresh. The required title prevents a record that cannot be found later.</p></div><div className="info-card"><strong>Review</strong><p>Search by a name, category, status, or note. Empty results are an invitation to change the query, not a dead end.</p></div><div className="info-card"><strong>Carry forward</strong><p>Export a Markdown or CSV copy before a handoff, a planning session, or a browser reset. Local data is yours to move.</p></div></div></section><section className="section"><p className="eyebrow">05 / WHAT THE TOOL DOES NOT DO</p><h2>Clear boundaries are part of the design.</h2><p>This app does not silently synchronize, infer facts, send reminders, or make a recommendation for you. Dates, labels, financial figures, health-related notes, disposal guidance, and any decisions based on them depend entirely on the information you enter and the context you verify.</p></section><section className="section"><p className="eyebrow">06 / KEEP A PORTABLE COPY</p><h2>Local-first should never mean trapped.</h2><p>Use JSON import and export for a browser-local backup, or CSV and Markdown when you need a readable copy. Imported JSON replaces the current local collection only after the file is successfully parsed; malformed files leave the saved records unchanged and show a clear error.</p></section><section className="section"><p className="eyebrow">07 / CONTINUE IN THE TOOL</p><h2>Use the real workspace, not a mock-up.</h2><p>The preview above is built from the same saved records used in the workspace. Open it to add, edit, remove, filter, import, and export local data.</p><div className="actions"><button className="primary" onClick={open}>Open workspace</button></div></section><footer className="section footer"><p className="eyebrow">08 / LOCAL PROJECT NOTES</p><p>This product stores its data in the active browser profile. Read the guide and limitations before relying on it for a consequential decision.</p></footer></>}
-function Workspace(){return <section className="workspace"><div className="toolbar"><input aria-label="Search records" value={query} onChange={e=>setQuery(e.target.value)} placeholder={'Search '+cfg.name}/><button onClick={()=>download(cfg.slug+'.md',toMarkdown(cfg.name,records))}>Export Markdown</button><button onClick={()=>download(cfg.slug+'.csv',csv(records),'text/csv')}>Export CSV</button><button onClick={()=>download(cfg.slug+'.json',JSON.stringify(records,null,2),'application/json')}>Export JSON</button><label className="import">Import JSON<input type="file" accept="application/json" onChange={e=>importJson(e.target.files?.[0])}/></label></div><div className="grid"><form onSubmit={add}><h2>Add garden</h2>{cfg.fields.map((f,i)=><label key={f}>{f}<input required={i===0} value={form[f]||''} onChange={e=>setForm({...form,[f]:e.target.value})} placeholder={'Enter '+f.toLowerCase()}/></label>)}<button className="primary">{editing?'Save changes':'Save record'}</button>{editing&&<button type="button" onClick={()=>{setEditing(null);setForm({})}}>Cancel edit</button>}{notice&&<p className="notice" role="status">{notice}</p>}</form><article className="records"><h2>{filtered.length} records</h2>{filtered.length===0?<p className="empty">No records match that search. Clear the search or create the first local record.</p>:filtered.map(r=><section className="card" key={r.id}><div><h3>{r.title}</h3>{cfg.fields.slice(1).map(f=><p key={f}><b>{f}</b> {r[f]||'—'}</p>)}</div><div><button onClick={()=>{setEditing(r);const values:Record<string,string>={};cfg.fields.forEach(f=>values[f]=r[f]||'');setForm(values);window.scrollTo({top:0,behavior:'smooth'})}}>Edit</button><button onClick={()=>{save(records.filter(x=>x.id!==r.id));setNotice('Record removed from this browser.')}}>Delete</button></div></section>)}</article></div><Special/></section>}
-function NotFound(){return <section className="section"><p className="eyebrow">404 / LOCAL ROUTE</p><h2>That page is not in this edition.</h2><p>Use the navigation to return to a known section.</p><button className="primary" onClick={()=>setPage('home')}>Return home</button></section>}
-function Guide({title}:{title:string}){return <Content kicker="02 / FIELD GUIDE" title={title} body="bed, plant, sunlight, watering, position are the working vocabulary in this tool. The guide does not prescribe a single right process; it explains what each field records, why it is there, and how to keep the record useful over time." cards={[['Use plain language','Write the term that a future version of you will recognise quickly.'],['Keep dates practical','Use a date only when it helps you decide what to do or review next.'],['Separate facts from notes','Use short fields for filtering and the note for the detail that does not fit a label.']]}/>}
-function Examples(){return <Content kicker="03 / WORKED EXAMPLES" title="A record with enough context." body="The sample records are fictional and labelled as demo data. They show the difference between a title that can be found, structured fields that can be scanned, and a note that preserves the reason behind a decision." cards={[['A current item','Marked In focus, with a near date and a concise note.'],['A scheduled item','Has a future date so it appears when you are planning ahead.'],['An edge case','Uses a longer note to prove that more context remains readable.']]}/>}
-function Reference(){return <Content kicker="04 / METHOD" title="How this local tool handles information." body="Bedmap stores records in this browser using localStorage. Search runs against the saved local data. Markdown and CSV exports are created in your browser. There is no account, server synchronization, automatic backup, or claim that this record is authoritative outside the information you enter." cards={[['Local first','Your records remain in the active browser profile until you export or remove them.'],['Simple exports','Exports are designed to be readable and portable, not a full database backup format.'],['Human review','Dates, amounts, labels, and reminders depend on the data you enter and should be checked before acting.']]}/>}
-function Help(){return <section className="section"><p className="eyebrow">05 / HELP & LIMITS</p><h2>Useful boundaries make a tool more trustworthy.</h2><div className="faq"><details open><summary>Where is my data stored?</summary><p>In localStorage for this browser profile. Clearing browser data may remove it; use an export for a copy you control.</p></details><details><summary>Is the demo data real?</summary><p>No. It is fictional sample material designed to show populated, long-text, status, and archive states.</p></details><details><summary>What happens when a form is incomplete?</summary><p>The first field is required. The form gives a plain-language message and keeps the entered values available to correct.</p></details><details><summary>Can this replace specialist advice?</summary><p>No. It is a personal organization aid. The limitations and relevant disclaimers should guide how you use the records.</p></details></div></section>}
-function Content({kicker,title,body,cards}:{kicker:string;title:string;body:string;cards:string[][]}){return <section className="section"><p className="eyebrow">{kicker}</p><h2>{title}</h2><p>{body}</p><div className="card-grid">{cards.map(c=><div className="info-card" key={c[0]}><strong>{c[0]}</strong><p>{c[1]}</p></div>)}</div></section>}
-function Special(){if((cfg.kind as string)==='algorithm')return <section className="lab"><h2>Visible operations</h2><p>Use these controls to see an ordered set change. They are deliberately small: the explanation matters more than spectacle.</p><button onClick={()=>setAnswer('Values sorted: 4, 7, 12, 19')}>Sort sample</button><button onClick={()=>setAnswer('One comparison explained: 12 is greater than 7, so it moves after 7.')}>Explain step</button><p role="status">{answer}</p></section>;if((cfg.kind as string)==='garden')return <section className="lab"><h2>Bed grid</h2><div className="bed">{Array.from({length:12},(_,i)=><button key={i} onClick={()=>setAnswer('Plant marker placed in bed cell '+(i+1))}>{answer.includes(String(i+1))?'●':'+'}</button>)}</div><p role="status">{answer||'Select a cell to place a marker.'}</p></section>;return <section className="lab"><h2>Practice note</h2><p>Use this local workspace with the guide alongside it. A good record is specific enough to help later and short enough to keep current.</p></section>}}
+import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { DemoTag, EmptyState, Field, Landing, NotFound, Notice, PageHead, Shell, uid, usePersistentState, useRoute } from './shared/ui';
+import {
+  CELL_CM, PLANTS, SUN_LABEL, addBed, bedAreaM2, bedAt, checkGarden, emptyGarden, gridSize, paintSun, placePlant, plantById, plantingAt, rectFrom, removeBed, removePlanting, resizeGarden, shoppingList, sunAt, sunShare,
+  type Garden, type Issue, type Plant, type Sun,
+} from './lib/garden';
+
+const KEY = 'bedmap:store';
+const NAV = [
+  { to: '/', label: 'Overview' },
+  { to: '/plan', label: 'Plan' },
+  { to: '/plants', label: 'Plants' },
+  { to: '/list', label: 'Plant list' },
+];
+
+type Tool = 'select' | 'bed' | 'sun' | 'plant' | 'erase';
+interface Store { garden: Garden; widthM: number; depthM: number; tool: Tool; brush: Sun; plant: string; demo: boolean }
+
+function demoGarden(): Garden {
+  const { cols, rows } = gridSize(6, 4);
+  let g = emptyGarden(cols, rows);
+  for (let x = 0; x < cols; x++) { g = paintSun(g, x, 0, 'shade'); g = paintSun(g, x, 1, 'part'); g = paintSun(g, x, 2, 'part'); }
+  for (let y = 3; y < rows; y++) for (let x = 17; x < cols; x++) g = paintSun(g, x, y, 'part');
+  g = addBed(g, { x: 1, y: 4, w: 8, h: 3 }, 'bed-1', 'Tomato bed').garden;
+  g = addBed(g, { x: 11, y: 4, w: 7, h: 3 }, 'bed-2', 'Veg bed').garden;
+  g = addBed(g, { x: 1, y: 9, w: 6, h: 2 }, 'bed-3', 'Herbs').garden;
+  const put: [string, number, number][] = [
+    ['tomato', 2, 4], ['tomato', 4, 4], ['tomato', 6, 4], ['basil', 3, 6], ['basil', 5, 6], ['marigold', 7, 6], ['marigold', 1, 6],
+    ['bean', 12, 4], ['bean', 13, 4], ['onion', 14, 4], ['carrot', 12, 6], ['carrot', 13, 6], ['lettuce', 15, 6], ['squash', 16, 5],
+    ['parsley', 2, 10], ['mint', 5, 9], ['strawberry', 3, 9],
+  ];
+  for (const [p, x, y] of put) g = placePlant(g, p, x, y, `d-${p}-${x}-${y}`).garden;
+  return g;
+}
+const DEFAULTS = (): Store => ({ garden: demoGarden(), widthM: 6, depthM: 4, tool: 'plant', brush: 'shade', plant: 'lettuce', demo: true });
+
+export default function App() {
+  const [route] = useRoute();
+  const [store, setStore] = usePersistentState<Store>(KEY, DEFAULTS);
+  const ctx = { store, setStore };
+  let page: ReactNode;
+  if (route === '/') page = <Home />;
+  else if (route === '/plan') page = <PlanPage {...ctx} />;
+  else if (route === '/plants') page = <PlantsPage {...ctx} />;
+  else if (route === '/list') page = <ListPage {...ctx} />;
+  else page = <NotFound />;
+  return (
+    <Shell name="Bedmap" wordmark={['Bed', 'map']} nav={NAV} route={route} cta={{ to: '/plan', label: 'Open the planner' }} footerNote="Spacing and companion notes are rules of thumb from common gardening guides. Your soil, climate and varieties matter more.">
+      {page}
+    </Shell>
+  );
+}
+
+type Ctx = { store: Store; setStore: (s: Store | ((s: Store) => Store)) => void };
+
+/* ---------- Map ---------- */
+const PX = 28;
+const SUN_FILL: Record<Sun, string> = { full: 'var(--sun-full)', part: 'var(--sun-part)', shade: 'var(--sun-shade)' };
+
+interface MapProps { g: Garden; highlight?: { x: number; y: number }[]; cursor?: { x: number; y: number } | null; preview?: { x: number; y: number; w: number; h: number } | null; small?: boolean }
+function GardenMap({ g, highlight = [], cursor, preview, small }: MapProps) {
+  const hi = new Set(highlight.map((c) => `${c.x},${c.y}`));
+  return (
+    <>
+      <g aria-hidden="true">
+        {g.sun.map((row, y) => [...row].map((_, x) => <rect key={`${x}-${y}`} x={x * PX} y={y * PX} width={PX} height={PX} fill={SUN_FILL[sunAt(g, x, y)]} className="cell" />))}
+      </g>
+      {g.beds.map((b) => (
+        <g key={b.id} className="bed">
+          <rect x={b.x * PX + 1} y={b.y * PX + 1} width={b.w * PX - 2} height={b.h * PX - 2} rx={4} />
+          {!small && <text x={b.x * PX + 6} y={b.y * PX - 5} className="bed-label">{b.name}</text>}
+        </g>
+      ))}
+      {g.plantings.map((p) => {
+        const info = plantById(p.plant)!;
+        const r = (info.spacing / CELL_CM) * PX / 2;
+        return (
+          <g key={p.id} className={`plant ${hi.has(`${p.x},${p.y}`) ? 'hi' : ''}`} transform={`translate(${p.x * PX + PX / 2} ${p.y * PX + PX / 2})`}>
+            <circle r={Math.max(r, 6)} className="spread" style={{ fill: info.color, stroke: info.color }} />
+            <circle r={10} style={{ fill: info.color }} className="dot" />
+            <text y={4} className="code">{info.code}</text>
+          </g>
+        );
+      })}
+      {preview && <rect className="preview" x={preview.x * PX} y={preview.y * PX} width={preview.w * PX} height={preview.h * PX} />}
+      {cursor && <rect className="cursor" x={cursor.x * PX + 1} y={cursor.y * PX + 1} width={PX - 2} height={PX - 2} />}
+    </>
+  );
+}
+
+/* ---------- Home ---------- */
+function HeroPreview() {
+  const g = useMemo(demoGarden, []);
+  return (
+    <div className="hero-bm">
+      <svg viewBox={`0 0 ${g.cols * PX} ${g.rows * PX}`} className="map" role="img" aria-label="Demo garden plan with three beds"><GardenMap g={g} small highlight={[{ x: 15, y: 6 }, { x: 16, y: 5 }]} /></svg>
+      <div className="hero-issues">
+        <span className="badge badge-err">Squash crowds lettuce</span>
+        <span className="badge badge-warn">Onion beside beans</span>
+        <span className="badge badge-ok">Basil helps tomatoes</span>
+      </div>
+    </div>
+  );
+}
+
+function Home() {
+  return (
+    <Landing
+      eyebrow="Garden layout planner"
+      title={<>Plan the plot <em>before you dig.</em></>}
+      lead="Sketch your garden on a 30 cm grid, mark where the sun falls, draw beds and drop in plants. Bedmap checks spacing, sun needs and neighbours as you go, then gives you a plant list."
+      primary={{ href: '#/plan', label: 'Open the planner' }}
+      secondary={{ href: '#/plants', label: 'Browse plants' }}
+      previewLabel="Demo garden — 6 × 4 m"
+      preview={<HeroPreview />}
+      meta={['Runs in your browser', 'Mouse, touch or keyboard', 'Demo garden included']}
+      steps={[
+        { title: 'Map the light', body: 'Paint full sun, part shade and shade — north is at the top.' },
+        { title: 'Draw beds', body: 'Drag out rectangles; beds can’t overlap, so paths stay clear.' },
+        { title: 'Plant and check', body: 'Place 22 common crops, herbs and flowers and see problems instantly.' },
+      ]}
+      features={[
+        { title: 'Spacing', body: 'Each plant’s spread is drawn to scale; crowded pairs are flagged with the distance they need.' },
+        { title: 'Sun', body: 'Tomatoes in shade or foxgloves in full sun get a warning.' },
+        { title: 'Neighbours', body: 'Good companions and poor neighbours within 90 cm, plus tall crops shading sun-lovers.' },
+        { title: 'Plant list', body: 'Counts per plant with spacing and growing notes, ready to print.' },
+      ]}
+      closing={{ title: <>Right plant, <em>right place.</em></>, action: { href: '#/plan', label: 'Start planning' } }}
+    />
+  );
+}
+
+/* ---------- Plan ---------- */
+const TOOLS: [Tool, string, string][] = [
+  ['select', 'Inspect', 'Click a cell to see what’s there.'],
+  ['sun', 'Paint sun', 'Drag across cells to set how much sun they get.'],
+  ['bed', 'Draw bed', 'Drag a rectangle. With the keyboard, press Enter at two corners.'],
+  ['plant', 'Place plant', 'Click a cell inside a bed.'],
+  ['erase', 'Erase', 'Removes a plant, or a bed (and its plants) if the cell has no plant.'],
+];
+
+function PlanPage({ store, setStore }: Ctx) {
+  const g = store.garden;
+  const svg = useRef<SVGSVGElement>(null);
+  const [cursor, setCursor] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [focused, setFocused] = useState(false);
+  const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [msg, setMsg] = useState<{ kind: 'info' | 'error' | 'success'; text: string } | null>(null);
+  const [picked, setPicked] = useState<Issue | null>(null);
+  const [size, setSize] = useState({ w: String(store.widthM), d: String(store.depthM) });
+  const [sizeErr, setSizeErr] = useState<string | null>(null);
+  const issues = useMemo(() => checkGarden(g), [g]);
+  const set = (patch: Partial<Store>) => setStore((s) => ({ ...s, ...patch }));
+  const setGarden = (garden: Garden) => setStore((s) => ({ ...s, garden }));
+
+  function describe(x: number, y: number) {
+    const b = bedAt(g, x, y), p = plantingAt(g, x, y);
+    return `Column ${x + 1}, row ${y + 1}: ${SUN_LABEL[sunAt(g, x, y)].split(' (')[0]}${b ? `, in ${b.name}` : ''}${p ? `, ${plantById(p.plant)!.name}` : ''}.`;
+  }
+  function apply(x: number, y: number, phase: 'down' | 'move' | 'up' | 'key') {
+    const t = store.tool;
+    if (t === 'select') { if (phase !== 'move') setMsg({ kind: 'info', text: describe(x, y) }); return; }
+    if (t === 'sun') { setGarden(paintSun(g, x, y, store.brush)); return; }
+    if (t === 'bed') {
+      if (phase === 'down' || (phase === 'key' && !anchor)) { setAnchor({ x, y }); setHover({ x, y }); if (phase === 'key') setMsg({ kind: 'info', text: `Corner set at column ${x + 1}, row ${y + 1}. Move to the opposite corner and press Enter.` }); return; }
+      if (phase === 'move') { setHover({ x, y }); return; }
+      if (anchor) {
+        const r = addBed(g, rectFrom(anchor, { x, y }), uid('bed'));
+        setAnchor(null); setHover(null);
+        if (r.error) setMsg({ kind: 'error', text: r.error });
+        else { setGarden(r.garden); const b = r.garden.beds[r.garden.beds.length - 1]; setMsg({ kind: 'success', text: `${b.name} added: ${(b.w * CELL_CM) / 100} × ${(b.h * CELL_CM) / 100} m.` }); }
+      }
+      return;
+    }
+    if (phase === 'move' || phase === 'up') return;
+    if (t === 'plant') {
+      const r = placePlant(g, store.plant, x, y, uid('p'));
+      if (r.error) setMsg({ kind: 'error', text: r.error });
+      else { setGarden(r.garden); setMsg({ kind: 'success', text: `${plantById(store.plant)!.name} planted at column ${x + 1}, row ${y + 1}.` }); }
+      return;
+    }
+    if (t === 'erase') {
+      const p = plantingAt(g, x, y);
+      if (p) { setGarden(removePlanting(g, p.id)); setMsg({ kind: 'success', text: `${plantById(p.plant)!.name} removed.` }); return; }
+      const b = bedAt(g, x, y);
+      if (b) {
+        const n = g.plantings.filter((q) => q.x >= b.x && q.x < b.x + b.w && q.y >= b.y && q.y < b.y + b.h).length;
+        if (n && !window.confirm(`Remove ${b.name} and its ${n} plant${n === 1 ? '' : 's'}?`)) return;
+        setGarden(removeBed(g, b.id)); setMsg({ kind: 'success', text: `${b.name} removed.` });
+      } else setMsg({ kind: 'info', text: 'Nothing to erase here.' });
+    }
+  }
+  function cellFrom(e: React.PointerEvent) {
+    const r = svg.current!.getBoundingClientRect();
+    const x = Math.floor(((e.clientX - r.left) / r.width) * g.cols), y = Math.floor(((e.clientY - r.top) / r.height) * g.rows);
+    return { x: Math.max(0, Math.min(g.cols - 1, x)), y: Math.max(0, Math.min(g.rows - 1, y)) };
+  }
+  function onKey(e: React.KeyboardEvent) {
+    const d: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    if (d[e.key]) {
+      e.preventDefault();
+      const c = { x: Math.max(0, Math.min(g.cols - 1, cursor.x + d[e.key][0])), y: Math.max(0, Math.min(g.rows - 1, cursor.y + d[e.key][1])) };
+      setCursor(c);
+      if (anchor) setHover(c);
+      if (store.tool === 'sun' && e.shiftKey) setGarden(paintSun(g, c.x, c.y, store.brush));
+      setMsg({ kind: 'info', text: describe(c.x, c.y) });
+    } else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apply(cursor.x, cursor.y, 'key'); }
+    else if (e.key === 'Escape' && anchor) { setAnchor(null); setHover(null); setMsg({ kind: 'info', text: 'Bed cancelled.' }); }
+  }
+  function resize(e: React.FormEvent) {
+    e.preventDefault();
+    const w = Number(size.w), d = Number(size.d);
+    if (!(w >= 1 && w <= 20 && d >= 1 && d <= 20)) return setSizeErr('Width and depth must be between 1 and 20 metres.');
+    const { cols, rows } = gridSize(w, d);
+    const r = resizeGarden(g, cols, rows);
+    if (r.dropped && !window.confirm(`Resizing removes ${r.dropped} bed${r.dropped === 1 ? '' : 's'} or plant${r.dropped === 1 ? '' : 's'} that won’t fit. Continue?`)) return;
+    setSizeErr(null);
+    setStore((s) => ({ ...s, garden: r.garden, widthM: w, depthM: d }));
+    setMsg({ kind: 'success', text: `Garden resized to ${w} × ${d} m.` });
+  }
+  const preview = anchor && hover ? rectFrom(anchor, hover) : null;
+  const errors = issues.filter((i) => i.level === 'error').length, warns = issues.filter((i) => i.level === 'warn').length;
+  const tool = TOOLS.find((t) => t[0] === store.tool)!;
+
+  return (
+    <div className="stack">
+      <PageHead eyebrow="Plan" title={<>Your <em>{store.widthM} × {store.depthM} m</em> plot.</>} description="North is at the top. One square is 30 cm." actions={store.demo ? <button type="button" className="btn btn-ghost" onClick={() => { const { cols, rows } = gridSize(store.widthM, store.depthM); setStore((s) => ({ ...s, garden: emptyGarden(cols, rows), demo: false })); setMsg({ kind: 'success', text: 'Demo garden cleared.' }); }}>Clear demo garden</button> : <button type="button" className="btn btn-ghost" onClick={() => setStore((s) => ({ ...s, garden: demoGarden(), widthM: 6, depthM: 4, demo: true }))}>Load demo garden</button>} />
+      {store.demo && <p><DemoTag /> <span className="small muted">A sample layout with a few deliberate problems.</span></p>}
+      <div className="plan-layout">
+        <div className="stack">
+          <div className="card toolbar">
+            <div className="tabs" role="radiogroup" aria-label="Tool">
+              {TOOLS.map(([id, label]) => <button key={id} type="button" role="radio" aria-checked={store.tool === id} onClick={() => { set({ tool: id }); setAnchor(null); setHover(null); }}>{label}</button>)}
+            </div>
+            {store.tool === 'sun' && (
+              <div className="tabs" role="radiogroup" aria-label="Sun brush">
+                {(['full', 'part', 'shade'] as Sun[]).map((s) => <button key={s} type="button" role="radio" aria-checked={store.brush === s} onClick={() => set({ brush: s })}><i className="sw" style={{ background: SUN_FILL[s] }} />{SUN_LABEL[s].split(' (')[0]}</button>)}
+              </div>
+            )}
+            {store.tool === 'plant' && (
+              <Field label="Plant">{(p) => <select {...p} value={store.plant} onChange={(e) => set({ plant: e.target.value })}>{PLANTS.map((pl) => <option key={pl.id} value={pl.id}>{pl.name} — {pl.spacing} cm</option>)}</select>}</Field>
+            )}
+            <p className="small muted tool-hint">{tool[2]}</p>
+          </div>
+          <div className="map-wrap card">
+            <span className="north" aria-hidden="true">N ↑</span>
+            <svg
+              ref={svg}
+              className={`map tool-${store.tool}`}
+              viewBox={`0 0 ${g.cols * PX} ${g.rows * PX}`}
+              style={{ width: g.cols * PX, maxWidth: '100%' }}
+              tabIndex={0}
+              role="application"
+              aria-label={`Garden grid, ${g.cols} by ${g.rows} squares. Tool: ${tool[1]}. Arrow keys move, Enter applies${store.tool === 'sun' ? ', Shift with arrows paints' : ''}.`}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              onKeyDown={onKey}
+              onPointerDown={(e) => { svg.current?.setPointerCapture?.(e.pointerId); const c = cellFrom(e); setCursor(c); setDragging(true); apply(c.x, c.y, 'down'); }}
+              onPointerMove={(e) => { if (!dragging) return; const c = cellFrom(e); if (c.x === cursor.x && c.y === cursor.y && store.tool !== 'bed') return; setCursor(c); apply(c.x, c.y, 'move'); }}
+              onPointerUp={(e) => { if (!dragging) return; setDragging(false); const c = cellFrom(e); apply(c.x, c.y, 'up'); }}
+            >
+              <GardenMap g={g} highlight={picked?.cells} cursor={focused ? cursor : null} preview={preview} />
+            </svg>
+          </div>
+          <p className="sr-only" aria-live="polite">{msg?.text}</p>
+          {msg && <Notice kind={msg.kind} onDismiss={() => setMsg(null)}>{msg.text}</Notice>}
+          <div className="legend small">
+            {(['full', 'part', 'shade'] as Sun[]).map((s) => <span key={s}><i className="sw" style={{ background: SUN_FILL[s] }} />{SUN_LABEL[s]}</span>)}
+            <span><i className="sw bed-sw" />Bed</span>
+          </div>
+        </div>
+
+        <aside className="stack">
+          <section className="card stack" aria-labelledby="chk-t">
+            <div className="row-between"><h2 id="chk-t" className="h3">Checks</h2><span className="small" data-testid="check-summary">{errors} crowded · {warns} warning{warns === 1 ? '' : 's'}</span></div>
+            {issues.length ? (
+              <ul className="issues" aria-label="Layout checks">
+                {issues.map((i) => (
+                  <li key={i.id} className={picked?.id === i.id ? 'on' : ''}>
+                    <span className={`badge ${i.level === 'error' ? 'badge-err' : i.level === 'warn' ? 'badge-warn' : 'badge-ok'}`}>{i.level === 'error' ? 'Crowded' : i.level === 'warn' ? 'Warning' : 'Good'}</span>
+                    <span>{i.message}</span>
+                    <button type="button" className="btn btn-sm btn-ghost" aria-pressed={picked?.id === i.id} onClick={() => setPicked(picked?.id === i.id ? null : i)}>{picked?.id === i.id ? 'Hide on map' : 'Show on map'}</button>
+                  </li>
+                ))}
+              </ul>
+            ) : <EmptyState title={g.plantings.length ? 'No problems found' : 'Nothing planted yet'}>{g.plantings.length ? 'Spacing, sun and neighbours all look fine.' : 'Draw a bed, then choose Place plant.'}</EmptyState>}
+          </section>
+          <section className="card stack" aria-labelledby="beds-t">
+            <h2 id="beds-t" className="h3">Beds</h2>
+            {g.beds.length ? (
+              <ul className="beds">
+                {g.beds.map((b) => {
+                  const s = sunShare(g, b), n = b.w * b.h;
+                  return (
+                    <li key={b.id}>
+                      <Field label="Name">{(p) => <input {...p} value={b.name} maxLength={30} onChange={(e) => setGarden({ ...g, beds: g.beds.map((x) => (x.id === b.id ? { ...x, name: e.target.value } : x)) })} />}</Field>
+                      <span className="small muted">{(b.w * CELL_CM) / 100} × {(b.h * CELL_CM) / 100} m · {bedAreaM2(b)} m² · {Math.round((s.full / n) * 100)}% full sun</span>
+                      <span className="sunbar" aria-hidden="true">{(['full', 'part', 'shade'] as Sun[]).map((k) => <i key={k} style={{ flexGrow: s[k], background: SUN_FILL[k] }} />)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : <p className="small muted">No beds yet. Choose Draw bed and drag on the grid.</p>}
+          </section>
+          <form className="card stack" onSubmit={resize} noValidate aria-labelledby="size-t">
+            <h2 id="size-t" className="h3">Garden size</h2>
+            <div className="form-grid two">
+              <Field label="Width (m)" error={sizeErr}>{(p) => <input {...p} inputMode="decimal" value={size.w} onChange={(e) => setSize({ ...size, w: e.target.value })} />}</Field>
+              <Field label="Depth (m)">{(p) => <input {...p} inputMode="decimal" value={size.d} onChange={(e) => setSize({ ...size, d: e.target.value })} />}</Field>
+            </div>
+            <div><button type="submit" className="btn btn-sm">Resize</button></div>
+          </form>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Plants ---------- */
+function PlantsPage({ setStore }: Ctx) {
+  const [sun, setSun] = useState<Sun | 'any'>('any');
+  const [group, setGroup] = useState<Plant['group'] | 'any'>('any');
+  const list = PLANTS.filter((p) => (sun === 'any' || p.sun.includes(sun)) && (group === 'any' || p.group === group));
+  const name = (id: string) => plantById(id)!.name;
+  return (
+    <div className="stack">
+      <PageHead eyebrow="Plants" title={<>{PLANTS.length} plants, <em>and who they like.</em></>} description="Spacing is the distance between plants; companions and poor neighbours count within 90 cm." />
+      <div className="card filters">
+        <Field label="Sun">{(p) => <select {...p} value={sun} onChange={(e) => setSun(e.target.value as Sun | 'any')}><option value="any">Any</option>{(['full', 'part', 'shade'] as Sun[]).map((s) => <option key={s} value={s}>{SUN_LABEL[s]}</option>)}</select>}</Field>
+        <Field label="Type">{(p) => <select {...p} value={group} onChange={(e) => setGroup(e.target.value as Plant['group'] | 'any')}><option value="any">Any</option>{['Vegetable', 'Herb', 'Fruit', 'Flower'].map((g) => <option key={g}>{g}</option>)}</select>}</Field>
+        <span className="small muted" aria-live="polite">{list.length} shown</span>
+      </div>
+      {list.length ? (
+        <div className="plant-grid">
+          {list.map((p) => (
+            <article key={p.id} className="card stack plant-card" aria-labelledby={`pl-${p.id}`}>
+              <div className="row-gap"><span className="pcode" style={{ background: p.color }} aria-hidden="true">{p.code}</span><h2 id={`pl-${p.id}`} className="h3">{p.name}</h2></div>
+              <dl className="facts">
+                <div><dt>Spacing</dt><dd>{p.spacing} cm</dd></div>
+                <div><dt>Height</dt><dd>{p.height} cm</dd></div>
+                <div><dt>Sun</dt><dd>{p.sun.map((s) => SUN_LABEL[s].split(' (')[0]).join(', ')}</dd></div>
+              </dl>
+              {p.friends.length > 0 && <p className="small"><strong>Good with:</strong> {p.friends.map(name).join(', ')}</p>}
+              {p.foes.length > 0 && <p className="small"><strong>Keep from:</strong> {p.foes.map(name).join(', ')}</p>}
+              <p className="small muted">{p.note}</p>
+              <div><button type="button" className="btn btn-sm" onClick={() => { setStore((s) => ({ ...s, plant: p.id, tool: 'plant' })); window.location.hash = '/plan'; }}>Plant {p.name.toLowerCase()}</button></div>
+            </article>
+          ))}
+        </div>
+      ) : <EmptyState title="No plants match">Try another sun or type filter.</EmptyState>}
+    </div>
+  );
+}
+
+/* ---------- List ---------- */
+function ListPage({ store }: Ctx) {
+  const g = store.garden;
+  const list = shoppingList(g);
+  const issues = checkGarden(g);
+  return (
+    <div className="stack">
+      <PageHead eyebrow="Plant list" title={<>What to <em>buy and sow.</em></>} description={`${g.plantings.length} plants in ${g.beds.length} beds · ${g.beds.reduce((s, b) => s + bedAreaM2(b), 0).toFixed(2)} m² of growing space`} actions={list.length ? <button type="button" className="btn" onClick={() => window.print()}>Print</button> : undefined} />
+      {issues.some((i) => i.level !== 'good') && <Notice kind="warn">{issues.filter((i) => i.level === 'error').length} crowded pairs and {issues.filter((i) => i.level === 'warn').length} warnings on the plan. <a href="#/plan">Review them</a> before buying.</Notice>}
+      {list.length ? (
+        <div className="table-wrap card flush">
+          <table className="table">
+            <caption className="sr-only">Plants needed</caption>
+            <thead><tr><th scope="col">Plant</th><th scope="col" className="num">Count</th><th scope="col" className="num">Spacing</th><th scope="col">Sun</th><th scope="col">Notes</th></tr></thead>
+            <tbody>{list.map(({ plant, count }) => (
+              <tr key={plant.id}>
+                <th scope="row"><span className="pcode sm" style={{ background: plant.color }} aria-hidden="true">{plant.code}</span>{plant.name}</th>
+                <td className="num" data-testid={`count-${plant.id}`}>{count}</td>
+                <td className="num">{plant.spacing} cm</td>
+                <td>{plant.sun.map((s) => SUN_LABEL[s].split(' (')[0]).join(', ')}</td>
+                <td className="small">{plant.note}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      ) : <EmptyState title="Nothing planted yet" actions={<a className="btn btn-primary" href="#/plan">Open the planner</a>}>Plants you place on the plan are counted here.</EmptyState>}
+    </div>
+  );
+}
